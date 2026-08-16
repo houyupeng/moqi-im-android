@@ -552,7 +552,7 @@ class KeyboardView @JvmOverloads constructor(
                 stopT9LetterLongPress()
                 stopKeyRepeat()
                 pressedKey = hit
-                startKeyRepeatIfNeeded(hit)
+                // 手指滑入的键不启动连发：滑到 ⌫ 不会立即删除，重复键必须真正按下才生效。
                 startSpaceLongPressIfNeeded(hit)
                 startT9LetterLongPressIfNeeded(hit)
                 invalidate()
@@ -571,7 +571,8 @@ class KeyboardView @JvmOverloads constructor(
                     dispatchSwipeKey(startKey)
                 } else if (!spaceLongPressWasActive) {
                     pressedKey?.let { keyPos ->
-                        if (!repeatWasActive) {
+                        // 滑入的重复键（如 ⌫）不触发删除：只有按下时就落在该键上才生效。
+                        if (!repeatWasActive && (keyAt(keyPos)?.isRepeatable != true || keyPos == touchStartKey)) {
                             dispatchKey(keyPos)
                         }
                     }
@@ -996,8 +997,8 @@ class KeyboardView @JvmOverloads constructor(
 
     private fun qwertyCnRows(): List<List<KeyDefinition>> = listOf(
         rowOf("qwertyuiop", "1234567890"),
-        rowOf("asdfghjkl", listOf("~", "!", "@", "#", "%", "“”", "（）", "*", "_")),
-        rowOfWithExtras("zxcvbnm", listOf("`", "+", "-", "?", "：", "；", "/")),
+        rowOf("asdfghjkl", listOf("~", "！", "@", "#", "%", "“”", "（）", "*", "_")),
+        rowOfWithExtras("zxcvbnm", listOf("`", "+", "-", "？", "：", "；", "/")),
         bottomRowCn()
     )
 
