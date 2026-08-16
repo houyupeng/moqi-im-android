@@ -824,11 +824,11 @@ class MoqiInputMethodService : InputMethodService() {
 
     private fun handleBackspace() {
         if (keyboardView?.isDirectCommitLayout() == true) {
-            currentInputConnection.deleteSurroundingText(1, 0)
+            deleteSurroundingCodePoint()
             return
         }
         if (!shouldRouteBackspaceToEngine()) {
-            currentInputConnection.deleteSurroundingText(1, 0)
+            deleteSurroundingCodePoint()
             return
         }
         if (isT9Mode && currentMode == InputMode.PINYIN && t9PinyinDigits.isNotEmpty()) {
@@ -840,6 +840,18 @@ class MoqiInputMethodService : InputMethodService() {
         submitMoqiKey(MoqiImeKeyMapper.VK_BACK, fallbackOnFailure = true) {
             sendDownUpKeyEvents(KeyEvent.KEYCODE_DEL)
         }
+    }
+
+    private fun deleteSurroundingCodePoint() {
+        val textBeforeCursor = currentInputConnection.getTextBeforeCursor(2, 0)?.toString() ?: ""
+        val deleteCount = if (textBeforeCursor.length >= 2) {
+            val last = textBeforeCursor[textBeforeCursor.length - 1]
+            val secondLast = textBeforeCursor[textBeforeCursor.length - 2]
+            if (Character.isLowSurrogate(last) && Character.isHighSurrogate(secondLast)) 2 else 1
+        } else {
+            1
+        }
+        currentInputConnection.deleteSurroundingText(deleteCount, 0)
     }
 
     private fun shouldRouteBackspaceToEngine(): Boolean {
