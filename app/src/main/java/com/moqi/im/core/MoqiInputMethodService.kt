@@ -1181,9 +1181,9 @@ class MoqiInputMethodService : InputMethodService() {
             return
         }
         val t9Generation = t9ReplayGeneration
-        engineRunner.keyDown(keyCode, charCode) { engineResult ->
+        val receive: (MoqiImeEngineRunner.EngineResult) -> Unit = receive@{ engineResult ->
             if (isT9Mode && currentMode == InputMode.PINYIN && t9Generation != t9ReplayGeneration) {
-                return@keyDown
+                return@receive
             }
             val result = engineResult.result
             ImeDebugLog.d(TAG) {
@@ -1192,45 +1192,19 @@ class MoqiInputMethodService : InputMethodService() {
                     "commit=${result.commit} candidates=${result.candidates.size} error=${result.error}"
             }
             val handled = applyMoqiResult(result)
-            if (!handled && shouldRetryWithFullPinyin(result, charCode, retryFullPinyinOnUnhandled)) {
-                retryKeyWithFullPinyin(keyCode, charCode)
-                return@keyDown
-            }
             val shouldFallback = fallback != null && !handled &&
                 ((fallbackOnSuccessOnly && result.success) || fallbackOnFailure || (!fallbackOnSuccessOnly && result.success))
             if (shouldFallback) {
                 fallback?.invoke()
             }
         }
-    }
-
-    private fun shouldRetryWithFullPinyin(
-        result: MoqiImeResult,
-        charCode: Int,
-        retryFullPinyinOnUnhandled: Boolean
-    ): Boolean {
-        if (!retryFullPinyinOnUnhandled || !result.success || result.handled) return false
-        if (currentMode != InputMode.PINYIN) return false
-        if (result.composition.isNotBlank() || result.commit.isNotBlank()) return false
-        if (charCode !in 'a'.code..'z'.code && charCode !in 'A'.code..'Z'.code) return false
-        return currentSchemaId.contains("double_pinyin", ignoreCase = true)
-    }
-
-    private fun retryKeyWithFullPinyin(keyCode: Int, charCode: Int) {
-        val targetSchema = "rime_frost"
-        ImeDebugLog.d(TAG) {
-            "retry unhandled alphabet key with full pinyin schema current=$currentSchemaId " +
-                "target=$targetSchema charCode=$charCode"
-        }
-        engineRunner.selectSchema(targetSchema) { schemaResult, schemaId ->
-            if (!schemaResult.result.success) {
-                applyMoqiResult(schemaResult.result)
-                return@selectSchema
+        if (retryFullPinyinOnUnhandled && currentMode == InputMode.PINYIN) {
+            engineRunner.keyDownWithPinyinFallback(keyCode, charCode) { result, schema ->
+                if (schema.isNotEmpty()) applySchemaLayout(schema)
+                receive(result)
             }
-            applySchemaLayout(schemaId.ifBlank { targetSchema })
-            engineRunner.keyDown(keyCode, charCode) { retryResult ->
-                applyMoqiResult(retryResult.result)
-            }
+        } else {
+            engineRunner.keyDown(keyCode, charCode, receive)
         }
     }
 
@@ -1252,7 +1226,7 @@ class MoqiInputMethodService : InputMethodService() {
             currentMode = modeBeforeVoice
             resetTextEngine()
         }
-        resetT9State()
+        clearTextEngineState()
         isT9Mode = t9
         updateKeyboard()
         if (currentMode == InputMode.ENGLISH) {
@@ -1266,7 +1240,6 @@ class MoqiInputMethodService : InputMethodService() {
                 return@selectSchema
             }
             applySchemaLayout(schemaId.ifBlank { targetSchema })
-            resetTextEngine()
         }
     }
 
