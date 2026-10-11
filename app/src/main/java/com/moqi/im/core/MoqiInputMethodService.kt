@@ -141,6 +141,7 @@ class MoqiInputMethodService : InputMethodService() {
     private var shiftActive: Boolean = false
     private var shiftLocked: Boolean = false
     private var isT9Mode: Boolean = false
+    private val textLayouts = TextKeyboardLayouts()
     private var modeBeforeVoice: InputMode = InputMode.PINYIN
     private var sherpaVoiceEngine: SherpaVoiceEngine? = null
     private var isListening: Boolean = false
@@ -1021,6 +1022,7 @@ class MoqiInputMethodService : InputMethodService() {
             lastChineseMode = mode
         }
         currentMode = mode
+        isT9Mode = textLayouts.isT9(mode == InputMode.ENGLISH)
         shiftActive = false
         shiftLocked = false
         resetTextEngine()
@@ -1242,8 +1244,10 @@ class MoqiInputMethodService : InputMethodService() {
     }
 
     private fun applySchemaLayout(schemaId: String) {
+        if (schemaId.isBlank()) return
         currentSchemaId = schemaId
-        isT9Mode = isT9Schema(schemaId)
+        textLayouts.applySchema(schemaId)
+        isT9Mode = textLayouts.isT9(currentMode == InputMode.ENGLISH)
         updateKeyboard()
     }
 
@@ -1253,6 +1257,7 @@ class MoqiInputMethodService : InputMethodService() {
             resetTextEngine()
         }
         resetT9State()
+        textLayouts.select(currentMode == InputMode.ENGLISH, t9)
         isT9Mode = t9
         updateKeyboard()
         if (currentMode == InputMode.ENGLISH) {
@@ -1268,10 +1273,6 @@ class MoqiInputMethodService : InputMethodService() {
             applySchemaLayout(schemaId.ifBlank { targetSchema })
             resetTextEngine()
         }
-    }
-
-    private fun isT9Schema(schemaId: String): Boolean {
-        return schemaId.contains("_t9", ignoreCase = true) || schemaId.equals("rime_frost_t9", ignoreCase = true)
     }
 
     private fun updateUI() {
